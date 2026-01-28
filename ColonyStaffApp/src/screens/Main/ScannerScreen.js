@@ -1,46 +1,47 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Easing, Alert } from 'react-native';
+import { 
+  View, Text, StyleSheet, Animated, Easing, Alert, 
+  useWindowDimensions, TouchableOpacity, SafeAreaView, StatusBar 
+} from 'react-native';
 import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-camera';
-import { useIsFocused } from '@react-navigation/native';
-import Colors from '../../res/Colors';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 
-const ScannerScreen = ({ navigation }) => {
+const ScannerScreen = () => {
+  const { width, height } = useWindowDimensions();
+  const navigation = useNavigation();
   const [hasPermission, setHasPermission] = useState(false);
   const [isScanned, setIsScanned] = useState(false);
-  const isFocused = useIsFocused(); // Prevents "Duplicate CameraView" by managing lifecycle
-  const device = useCameraDevice('back');
   
-  // Animation for the "TV Laser" line
+  const isFocused = useIsFocused();
+  const device = useCameraDevice('back');
   const scanAnim = useRef(new Animated.Value(0)).current;
 
-  // 1. Handle Permissions
+  // Tablet Optimization: Scale the UI based on device width
+  const isTablet = width > 600;
+  const SCANNER_SIZE = isTablet ? 450 : width * 0.75;
+
   useEffect(() => {
-    const checkPermission = async () => {
+    (async () => {
       const status = await Camera.requestCameraPermission();
       setHasPermission(status === 'granted');
-      
-      if (status !== 'granted') {
-        Alert.alert("Camera Denied", "We need camera access to scan QR codes.");
-      }
-    };
-    checkPermission();
+    })();
   }, []);
 
-  // 2. TV Line Animation Logic
   useEffect(() => {
     if (isFocused && !isScanned) {
+      // Smoother "Breath" animation for the laser line
       Animated.loop(
         Animated.sequence([
           Animated.timing(scanAnim, {
-            toValue: 240,
-            duration: 2000,
-            easing: Easing.linear,
+            toValue: SCANNER_SIZE - 10,
+            duration: 2200,
+            easing: Easing.bezier(0.4, 0, 0.2, 1),
             useNativeDriver: true,
           }),
           Animated.timing(scanAnim, {
             toValue: 0,
-            duration: 2000,
-            easing: Easing.linear,
+            duration: 2200,
+            easing: Easing.bezier(0.4, 0, 0.2, 1),
             useNativeDriver: true,
           }),
         ])
@@ -48,98 +49,220 @@ const ScannerScreen = ({ navigation }) => {
     } else {
       scanAnim.stopAnimation();
     }
-  }, [isFocused, isScanned]);
+  }, [isFocused, isScanned, SCANNER_SIZE]);
 
-  // 3. QR Code Scanner Configuration
   const codeScanner = useCodeScanner({
     codeTypes: ['qr'],
     onCodeScanned: (codes) => {
-      // "Predicting" a scan: Logic fires immediately upon detection
       if (codes.length > 0 && !isScanned && isFocused) {
-        setIsScanned(true); 
+        setIsScanned(true);
         const qrValue = codes[0].value;
         
-        console.log("QR Data Captured:", qrValue);
-
-        // Success Feedback: Brief delay before navigation for better UX
+        // Provide immediate visual feedback for the staff member
         setTimeout(() => {
           navigation.navigate('Transaction', { qrData: qrValue });
-          // Reset scanned state after navigation so user can scan again later
+          // Short reset delay so the scanner is ready for the next customer later
           setTimeout(() => setIsScanned(false), 2000);
-        }, 500);
+        }, 300);
       }
     }
   });
 
-  if (!hasPermission) return <View style={styles.center}><Text>Waiting for permission...</Text></View>;
-  if (!device) return <View style={styles.center}><Text>No camera detected.</Text></View>;
+  if (!hasPermission) return <View style={styles.center}><Text style={styles.darkText}>Camera Access Required</Text></View>;
+  if (!device) return <View style={styles.center}><Text style={styles.darkText}>No Camera Found</Text></View>;
 
   return (
     <View style={styles.container}>
-      {/* 4. The Camera Engine */}
+      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+      
       <Camera
         style={StyleSheet.absoluteFill}
         device={device}
-        isActive={isFocused && !isScanned} // Critical: shuts down when navigating away
+        isActive={isFocused && !isScanned}
         codeScanner={codeScanner}
       />
 
-      {/* 5. UI Overlay */}
-      <View style={styles.overlay}>
-        <View style={[styles.frame, isScanned && styles.frameSuccess]}>
-          <Animated.View 
-            style={[
-              styles.scanLine, 
-              { transform: [{ translateY: scanAnim }] }
-            ]} 
-          />
+      {/* Layered UI Overlay */}
+      <View style={styles.fullOverlay}>
+        
+        {/* Header Area */}
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.header}>
+            <TouchableOpacity 
+              onPress={() => navigation.goBack()} 
+              style={styles.backButton}
+              hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+            >
+              <Text style={styles.backText}>✕</Text>
+            </TouchableOpacity>
+            <View style={styles.titleContainer}>
+              <Text style={styles.headerTitle}>LOYALTY SCANNER</Text>
+              <View style={styles.badge}><Text style={styles.badgeText}>STAFF ONLY</Text></View>
+            </View>
+          </View>
+        </SafeAreaView>
+
+        {/* Center Scanner Area */}
+        <View style={styles.mainActionArea}>
+          <View style={styles.textGroup}>
+            <Text style={styles.mainPrompt}>
+              {isScanned ? "Processing..." : "Scan Customer QR"}
+            </Text>
+            <Text style={styles.subPrompt}>Hold the tablet steady over the code</Text>
+          </View>
+
+          <View style={[styles.boxContainer, { width: SCANNER_SIZE, height: SCANNER_SIZE }]}>
+            {/* Corner Bracket Accents (Custom Shapes) */}
+            <View style={[styles.corner, styles.tl]} />
+            <View style={[styles.corner, styles.tr]} />
+            <View style={[styles.corner, styles.bl]} />
+            <View style={[styles.corner, styles.br]} />
+
+            {/* The Laser Line */}
+            <Animated.View 
+              style={[
+                styles.laserLine, 
+                { transform: [{ translateY: scanAnim }], width: SCANNER_SIZE - 20 }
+              ]} 
+            />
+
+            {/* Success Visual Confirmation */}
+            {isScanned && (
+              <View style={styles.scanSuccess}>
+                <View style={styles.checkCircle}>
+                  <Text style={styles.checkIcon}>✓</Text>
+                </View>
+              </View>
+            )}
+          </View>
         </View>
-        <Text style={styles.instructionText}>
-          {isScanned ? "Code Captured!" : "Align Colony QR Code"}
-        </Text>
+
+        {/* Footer / Instruction */}
+        <View style={styles.footerContainer}>
+           <Text style={styles.versionTag}>System Active • High Precision Mode</Text>
+        </View>
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  overlay: {
+  container: { flex: 1, backgroundColor: '#000',marginTop:30 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF' },
+  darkText: { color: '#000', fontSize: 18, fontWeight: '600' },
+  fullOverlay: {
     ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)', // Darken background to make laser pop
+    justifyContent: 'space-between'
+  },
+  safeArea: { flex: 0 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 24,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    marginRight: 16
   },
-  frame: {
-    width: 250,
-    height: 250,
-    borderWidth: 2,
-    borderColor: '#00FF00',
-    borderRadius: 12,
-    overflow: 'hidden',
+  backText: { color: '#FFF', fontSize: 20, fontWeight: 'bold' },
+  titleContainer: { flex: 1 },
+  headerTitle: { color: '#FFF', fontSize: 22, fontWeight: '900', letterSpacing: 1.5 },
+  badge: { 
+    backgroundColor: '#FFD700', 
+    alignSelf: 'flex-start', 
+    paddingHorizontal: 8, 
+    borderRadius: 4, 
+    marginTop: 4 
   },
-  frameSuccess: {
-    borderColor: 'yellow', // Feedback when scan is "predicted"
-    borderWidth: 4,
+  badgeText: { color: '#000', fontSize: 10, fontWeight: 'bold' },
+  
+  mainActionArea: {
+    flex: 1,
+    justifyContent: 'center',
+    marginTop:-40,
+    alignItems: 'center',
   },
-  scanLine: {
-    width: '100%',
-    height: 3,
-    backgroundColor: '#00FF00',
-    shadowColor: '#00FF00',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 10,
-    elevation: 8,
+  textGroup: {
+    alignItems: 'center',
+    marginBottom: 40,
   },
-  instructionText: {
+  mainPrompt: {
     color: '#FFF',
-    marginTop: 30,
-    fontSize: 16,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    padding: 10,
-    borderRadius: 8
+    fontSize: 32,
+    fontWeight: 'bold',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 10
+  },
+  subPrompt: {
+    color: '#CCC',
+    fontSize: 18,
+    marginTop: 8,
+  },
+  boxContainer: {
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  laserLine: {
+    height: 4,
+    backgroundColor: '#00FF00',
+    position: 'absolute',
+    top: 0,
+    borderRadius: 2,
+    shadowColor: '#00FF00',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 15,
+    elevation: 15,
+  },
+  // Custom Corners
+  corner: {
+    position: 'absolute',
+    width: 50,
+    height: 50,
+    borderColor: '#00FF00',
+    borderWidth: 6,
+  },
+  tl: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0, borderTopLeftRadius: 24 },
+  tr: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0, borderTopRightRadius: 24 },
+  bl: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0, borderBottomLeftRadius: 24 },
+  br: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0, borderBottomRightRadius: 24 },
+  
+  scanSuccess: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 255, 0, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 24,
+  },
+  checkCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#00FF00',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 5,
+    borderColor: '#FFF'
+  },
+  checkIcon: { fontSize: 60, color: '#FFF', fontWeight: 'bold' },
+  
+  footerContainer: {
+    paddingBottom: 40,
+    alignItems: 'center'
+  },
+  versionTag: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 12,
+    letterSpacing: 2,
+    textTransform: 'uppercase'
   }
 });
 
