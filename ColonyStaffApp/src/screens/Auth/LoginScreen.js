@@ -15,35 +15,37 @@ const LoginScreen = ({ navigation }) => {
   const dispatch = useDispatch();
 
   const handleLogin = async () => {
-    try {
-      setLoading(true);
-      // Endpoint: /user/staff-login
-      const response = await api.post('/user/staff-login', {
-        loginField: loginId, // e.g., "500501"
-        password: password, // e.g., "Colony@123"
-      });
+  const myHeaders = new Headers();
+myHeaders.append("Content-Type", "application/json");
 
-      // Save to Redux
-      dispatch(
-        setLogin({
-          token: response.data.token,
-          user: response.data.user,
-          isLoggedIn: true,
-        }),
-      );
-      await AsyncStorage.setItem('token', response.data.token);
-      await AsyncStorage.setItem('isLoggedIn', 'true');
+const raw = JSON.stringify({
+  "loginField": `${loginId}`,
+  "password": `${password}`
+});
 
-      // navigation.navigate('Scanner');
-    } catch (error) {
-      console.log('Login Error:', error.response?.data);
-      Alert.alert(
-        'Login Failed',
-        error.response?.data?.message || 'Check your ID and password',
-      );
-    } finally {
-      setLoading(false);
+const requestOptions = {
+  method: "POST",
+  headers: myHeaders,
+  body: raw,
+  redirect: "follow"
+};
+
+fetch("https://unesoteric-nonconversably-isabell.ngrok-free.dev/user/staff-login", requestOptions)
+  .then((response) => response.text())
+  .then((result) => {
+    const res = JSON.parse(result);
+    console.log('Login Response:', res);
+    if (res.success === true) {
+      const token = res?.data?.access_token;
+      AsyncStorage.setItem('token', token);
+      AsyncStorage.setItem('isLoggedIn', 'true');
+      dispatch(setLogin({ token, user: null }));
+    } else {
+      Alert.alert('Login Failed', res?.message || 'Invalid credentials');
     }
+  })
+  .catch((error) => console.error(error));
+   
   };
 
   return (

@@ -44,12 +44,15 @@ export default function AppNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator>
-            {/* <Stack.Screen options={{headerShown:false}} name="Scanner" component={ScannerScreen} /> */}
+            {/* <Stack.Screen options={{headerShown:false}} name="Scanner" component={ScannerScreen} />
+            <Stack.Screen options={{headerShown:false}} name="Transaction" component={TransactionScreen} /> */}
 
         {isLoggedIn ? (
           <>
             <Stack.Screen options={{headerShown:false}} name="Scanner" component={ScannerScreen} />
             <Stack.Screen options={{headerShown:false}} name="Transaction" component={TransactionScreen} />
+            <Stack.Screen options={{headerShown:false}} name="Login" component={LoginScreen} />
+
           </>
         ) : (
           <>

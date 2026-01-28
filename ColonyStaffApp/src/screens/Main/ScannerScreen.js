@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-camera';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ScannerScreen = () => {
   const { width, height } = useWindowDimensions();
@@ -68,6 +69,17 @@ const ScannerScreen = () => {
     }
   });
 
+  const handleLogout = async () => {
+  // 1. (Optional) If you were using any other state management (Redux/Zustand), clear it here.
+  await AsyncStorage.removeItem('token');
+  await AsyncStorage.removeItem('isLoggedIn');
+  // 2. Reset the navigation stack to the Login screen
+  navigation.reset({
+    index: 0,
+    routes: [{ name: 'Login' }], // Ensure 'Login' matches your stack navigator name
+  });
+};
+
   if (!hasPermission) return <View style={styles.center}><Text style={styles.darkText}>Camera Access Required</Text></View>;
   if (!device) return <View style={styles.center}><Text style={styles.darkText}>No Camera Found</Text></View>;
 
@@ -89,7 +101,7 @@ const ScannerScreen = () => {
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
             <TouchableOpacity 
-              onPress={() => navigation.goBack()} 
+              onPress={() => handleLogout()} 
               style={styles.backButton}
               hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
             >
@@ -171,11 +183,12 @@ const styles = StyleSheet.create({
     marginRight: 16
   },
   backText: { color: '#FFF', fontSize: 20, fontWeight: 'bold' },
-  titleContainer: { flex: 1 },
-  headerTitle: { color: '#FFF', fontSize: 22, fontWeight: '900', letterSpacing: 1.5 },
+  titleContainer: { flex: 1,alignSelf:'center' },
+  headerTitle: { color: '#FFF', fontSize: 22, fontWeight: '900', letterSpacing: 1.5,textAlign:'center' },
   badge: { 
+
     backgroundColor: '#FFD700', 
-    alignSelf: 'flex-start', 
+    alignSelf: 'center', 
     paddingHorizontal: 8, 
     borderRadius: 4, 
     marginTop: 4 
@@ -185,7 +198,7 @@ const styles = StyleSheet.create({
   mainActionArea: {
     flex: 1,
     justifyContent: 'center',
-    marginTop:-40,
+    marginTop:-50,
     alignItems: 'center',
   },
   textGroup: {
